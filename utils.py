@@ -18,7 +18,7 @@ class RNNModel(nn.Module):
         sequence_length = inputs.size(1)
         self.rnn_module.init_hidden(batch_size)
         ys = []
-        for t in xrange(sequence_length):
+        for t in range(sequence_length):
             h, _ = self.rnn_module(inputs[:, t])
             y = self.linear(h)
             ys.append(y)
