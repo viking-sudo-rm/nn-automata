@@ -73,12 +73,12 @@ def make_dataset(num_examples, string_length):
 
 def main():
     # Make training data.
-    length = 128
+    length = 32
     strings, counts = make_dataset(1000, length)
     strings_test, counts_test = make_dataset(100, length)
 
     # Create model.
-    model = BrokenModel(4)
+    model = BrokenModel(2)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters())
 

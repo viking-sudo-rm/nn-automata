@@ -1,1 +1,2 @@
-relu_lstm.pyc
+*.pyc
+models/*

@@ -1,8 +1,11 @@
-from __future__ import print_function
+from __future__ import division, print_function
 
 import torch
 from torch import nn
 import torch.nn.functional as F
+
+from discrete_rnn import NormalizedDiscreteSRN, RandomizedDiscreteSRN
+from utils import RNNModel
 
 
 def make_strings(num_examples, string_length):
@@ -21,11 +24,19 @@ def compute_parities(strings):
     return torch.stack(parities, 1)
 
 
-class Model(nn.Module):
+def make_dataset(dataset_length, string_length):
+    strings = make_strings(dataset_length, string_length)
+    parities = compute_parities(strings)  # compute_parities
+    strings = strings.unsqueeze(2).float()
+    parities = parities.unsqueeze(2).float()
+    return strings, parities
 
-    def __init__(self, hidden_size):
-        super(Model, self).__init__()
-        self._lstm = nn.LSTM(1, hidden_size, batch_first=True)
+
+class BasicLSTMModel(nn.Module):
+
+    def __init__(self, input_size, hidden_size):
+        super(BasicLSTMModel, self).__init__()
+        self._lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
         self._linear = nn.Linear(hidden_size, 1)
 
     def forward(self, strings):
@@ -35,29 +46,28 @@ class Model(nn.Module):
 
 def main():
     dataset_length = 1000
-    string_length = 15
-    hidden_size = 64
+    string_length = 16
+    hidden_size = 2
     batch_size = 16
 
     # Generate the data.
-    strings = make_strings(dataset_length, string_length)
-    parities = compute_parities(strings)
-    strings = strings.unsqueeze(2).float()
-    parities = parities.unsqueeze(2).float()
+    strings, parities = make_dataset(dataset_length, string_length)
+    strings_test, parities_test = make_dataset(dataset_length // 10, string_length)
 
     # Create model.
-    model = Model(hidden_size)
+    rnn_module = NormalizedDiscreteSRN(1, hidden_size)
+    # rnn_module = RandomizedDiscreteSRN(1, hidden_size, max_value=10000)
+    model = RNNModel(rnn_module)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters())
 
-    for epoch in range(10):
+    for epoch in range(200):
         print("=" * 10, "EPOCH", epoch, "=" * 10)
         perm = torch.randperm(dataset_length)
         strings = strings[perm]
         parities = parities[perm]
-        print(strings.size())
         for batch, i in enumerate(range(0, len(strings) - batch_size, batch_size)):
-            print("Batch", batch)
+            # print("Batch", batch)
             string_batch = strings[i : i + batch_size]
             parity_batch = parities[i : i + batch_size]
 
@@ -67,10 +77,19 @@ def main():
             loss.backward()
             optimizer.step()
 
-            accuracy = ((predicted_parity_batch > 0) == parity_batch.byte()).float()
+            # accuracy = ((predicted_parity_batch > 0) == parity_batch.byte()).float()
+            # print("\tLoss: %.2f" % torch.mean(loss).item())
+            # print("\tAcc: %.2f" % torch.mean(accuracy).item())
 
-            print("\tLoss: %.2f" % torch.mean(loss).item())
-            print("\tAcc: %.2f" % torch.mean(accuracy).item())
+        predicted_parities_test = model(parities_test)
+        accuracy = ((predicted_parities_test > 0) == parities_test.byte()).float()
+        print("Test Acc: %.2f" % torch.mean(accuracy).item())
+
+        # print("=" * 10, "PARAMS", epoch, "=" * 10)
+        # print(model.state_dict())
+        save_path = "models/parity-temp/epoch%d.dat" % epoch
+        print("Saved parameters to", save_path)
+        torch.save(model.state_dict(), save_path)
 
 if __name__ == "__main__":
     main()
