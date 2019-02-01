@@ -46,7 +46,7 @@ class BasicLSTMModel(nn.Module):
 
 def main():
     dataset_length = 1000
-    string_length = 16
+    string_length = 128
     hidden_size = 2
     batch_size = 16
 

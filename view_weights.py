@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+import sys
+
 import torch
 
 from discrete_rnn import NormalizedDiscreteSRN, RandomizedDiscreteSRN
@@ -19,4 +21,4 @@ def main(save_path):
 
 
 if __name__ == "__main__":
-    main("models/normalized/h=2.dat")
+    main(sys.argv[1])  # TODO: Use argparse here.
