@@ -1,5 +1,9 @@
 from __future__ import print_function
 
+from collections import defaultdict
+import numpy as np
+import pickle
+
 import torch
 from torch import nn
 from torch.autograd import Variable
@@ -21,7 +25,7 @@ class BrokenModel(nn.Module):
         sequence_length = inputs.size(1)
         self.relu_lstm.init_hidden(batch_size)
         ys = []
-        for t in xrange(sequence_length):
+        for t in range(sequence_length):
             h, _ = self.relu_lstm(inputs[:, t])
             y = self.linear(h)
             ys.append(y)
@@ -56,7 +60,7 @@ def get_counts(strings):
     sequence_length = strings.size(1)
     counts = []
     count = torch.zeros(batch_size).int()
-    for t in xrange(sequence_length):
+    for t in range(sequence_length):
         strip = torch.squeeze(strings[:, t])
         count = count + (2 * (strip.float() - .5)).int()
         counts.append(count > 0)
@@ -71,21 +75,20 @@ def make_dataset(num_examples, string_length):
     return strings, counts
 
 
-def main():
+def main(epochs=10, length=32, hidden_size=4):
     # Make training data.
-    length = 32
     strings, counts = make_dataset(1000, length)
     strings_test, counts_test = make_dataset(100, length)
 
     # Create model.
-    model = BrokenModel(2)
+    model = BrokenModel(hidden_size)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters())
 
     # Hyperparameters.
     batch_size = 10
 
-    for epoch in range(10):
+    for epoch in range(epochs):
         print("=" * 10, "EPOCH", epoch, "=" * 10)
         perm = torch.randperm(len(strings))
         strings = strings[perm]
@@ -111,6 +114,22 @@ def main():
         accuracy = ((predicted_counts_test > 0) == counts_test.byte()).float()
         print("Test Acc: %.2f" % torch.mean(accuracy).item())
 
+    return torch.mean(accuracy).item()
+
+
+def try_many_lengths():
+    accuracies = defaultdict(list)
+    for length in range(5, 35):
+        for trial in range(3):
+            print("=" * 20, "TRIAL", length, ".", trial, "=" * 20)
+            accuracies[length].append(main(epochs=30, length=length, hidden_size=2))
+
+    for length, accs in accuracies.items():
+        print("%d: med=%.2f, max=%.2f" % (length, np.median(accs), max(accs)))
+
+    with open("accuracies.dat", "w") as fh:
+        pickle.dump(accuracies, fh)
+
 
 if __name__ == "__main__":
-    main()
+    try_many_lengths()

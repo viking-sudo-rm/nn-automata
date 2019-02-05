@@ -2,3 +2,4 @@
 models/*
 .DS_Store
 __pycache__
+*.dat
