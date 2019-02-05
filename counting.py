@@ -117,12 +117,12 @@ def main(epochs=10, length=32, hidden_size=4):
     return torch.mean(accuracy).item()
 
 
-def try_many_lengths():
+def test_across_lengths(min_length, max_length, epochs=30, trials=5, hidden_size=4):
     accuracies = defaultdict(list)
-    for length in range(5, 35):
-        for trial in range(3):
-            print("=" * 20, "TRIAL", length, ".", trial, "=" * 20)
-            accuracies[length].append(main(epochs=30, length=length, hidden_size=2))
+    for length in range(min_length, max_length):
+        for trial in range(trials):
+            print("=" * 20, "TRIAL", length, ":", trial, "=" * 20)
+            accuracies[length].append(main(epochs=epochs, length=length, hidden_size=hidden_size))
 
     for length, accs in accuracies.items():
         print("%d: med=%.2f, max=%.2f" % (length, np.median(accs), max(accs)))
@@ -132,4 +132,5 @@ def try_many_lengths():
 
 
 if __name__ == "__main__":
-    try_many_lengths()
+    # test_across_lengths(4, 8, epochs=30, trials=3, hidden_size=2)
+    main(length=32, epochs=30, hidden_size=2)
