@@ -10,11 +10,12 @@ from utils import RNNModule
 
 class RandomizedDiscreteRNN(RNNModule):
 
-    def __init__(self, input_size, hidden_size, max_value):
+    def __init__(self, input_size, hidden_size, min_value, max_value):
         super(RandomizedDiscreteRNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.distribution = torch.distributions.uniform.Uniform(1, max_value)
+        # TODO: Pass in distribution as an object.
+        self.distribution = torch.distributions.uniform.Uniform(min_value, max_value)
 
     def compute_gate(self, operand):
         coefficients = self.distribution.sample(operand.shape)
@@ -25,8 +26,8 @@ class RandomizedDiscreteLSTM(RandomizedDiscreteRNN):
 
     """An LSTM with a random variable regularizer that is meant to discretize the computation."""
 
-    def __init__(self, input_size, hidden_size, max_value):
-        super(RandomizedDiscreteLSTM, self).__init__(input_size, hidden_size, max_value)
+    def __init__(self, input_size, hidden_size, min_value, max_value):
+        super(RandomizedDiscreteLSTM, self).__init__(input_size, hidden_size, min_value, max_value)
 
         self.h, self.c = None, None
 
@@ -56,8 +57,8 @@ class RandomizedDiscreteLSTM(RandomizedDiscreteRNN):
 
 class RandomizedDiscreteSRN(RandomizedDiscreteRNN):
 
-    def __init__(self, input_size, hidden_size, max_value):
-        super(RandomizedDiscreteSRN, self).__init__(input_size, hidden_size, max_value)
+    def __init__(self, input_size, hidden_size, min_value, max_value):
+        super(RandomizedDiscreteSRN, self).__init__(input_size, hidden_size, min_value, max_value)
         self.h = None
         self.weights_x = nn.Linear(input_size, hidden_size)
         self.weights_h = nn.Linear(hidden_size, hidden_size, bias=False)

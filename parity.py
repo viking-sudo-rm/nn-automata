@@ -47,7 +47,7 @@ class BasicLSTMModel(nn.Module):
 def main():
     dataset_length = 1000
     string_length = 128
-    hidden_size = 2
+    hidden_size = 16
     batch_size = 16
 
     # Generate the data.
@@ -55,8 +55,8 @@ def main():
     strings_test, parities_test = make_dataset(dataset_length // 10, string_length)
 
     # Create model.
-    rnn_module = NormalizedDiscreteSRN(1, hidden_size)
-    # rnn_module = RandomizedDiscreteSRN(1, hidden_size, max_value=10000)
+    # rnn_module = NormalizedDiscreteSRN(1, hidden_size)
+    rnn_module = RandomizedDiscreteSRN(1, hidden_size, min_value=1, max_value=1)
     model = RNNModel(rnn_module)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters())
@@ -83,7 +83,7 @@ def main():
 
         predicted_parities_test = model(parities_test)
         accuracy = ((predicted_parities_test > 0) == parities_test.byte()).float()
-        print("Test Acc: %.2f" % torch.mean(accuracy).item())
+        print("Test Acc: %.5f" % torch.mean(accuracy).item())
 
         # print("=" * 10, "PARAMS", epoch, "=" * 10)
         # print(model.state_dict())
