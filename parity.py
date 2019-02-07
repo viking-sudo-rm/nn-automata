@@ -55,8 +55,8 @@ def main():
     strings_test, parities_test = make_dataset(dataset_length // 10, string_length)
 
     # Create model.
-    # rnn_module = NormalizedDiscreteSRN(1, hidden_size)
-    rnn_module = RandomizedDiscreteSRN(1, hidden_size, min_value=1, max_value=1)
+    rnn_module = NormalizedDiscreteSRN(1, hidden_size)
+    # rnn_module = RandomizedDiscreteSRN(1, hidden_size, min_value=1, max_value=1)
     model = RNNModel(rnn_module)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters())

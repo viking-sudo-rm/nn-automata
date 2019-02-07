@@ -2,7 +2,6 @@ from abc import ABCMeta, abstractmethod
 
 import torch
 from torch import nn
-from torch.autograd import Variable
 import torch.nn.functional as F
 
 from utils import RNNModule
@@ -51,8 +50,8 @@ class RandomizedDiscreteLSTM(RandomizedDiscreteRNN):
         return self.h, self.c
 
     def init_hidden(self, batch_size):
-        self.h = Variable(torch.zeros(batch_size, self.hidden_size))
-        self.c = Variable(torch.zeros(batch_size, self.hidden_size))
+        self.h = torch.zeros(batch_size, self.hidden_size)
+        self.c = torch.zeros(batch_size, self.hidden_size)
 
 
 class RandomizedDiscreteSRN(RandomizedDiscreteRNN):
@@ -68,7 +67,7 @@ class RandomizedDiscreteSRN(RandomizedDiscreteRNN):
         return self.h, self.h
 
     def init_hidden(self, batch_size):
-        self.h = Variable(torch.zeros(batch_size, self.hidden_size))
+        self.h = torch.zeros(batch_size, self.hidden_size)
 
 
 class NormalizedDiscreteSRN(RNNModule):
@@ -87,4 +86,30 @@ class NormalizedDiscreteSRN(RNNModule):
         return self.h, self.h
 
     def init_hidden(self, batch_size):
-        self.h = Variable(torch.zeros(batch_size, self.hidden_size))
+        self.h = torch.zeros(batch_size, self.hidden_size)
+
+class RegularizedDiscreteSRN(RNNModule):
+
+    def __init__(self, input_size, hidden_size, reg_weight=10.):
+        super(RegularizedDiscreteSRN, self).__init__()
+        self.hidden_size = hidden_size
+        self.reg_weight = reg_weight
+        self.cumulative_reg_value = None
+        self.h = None
+        self.weights_x = nn.Linear(input_size, hidden_size)
+        self.weights_h = nn.Linear(hidden_size, hidden_size, bias=False)
+
+    def forward(self, x):
+        operand = self.weights_x(x) + self.weights_h(h)
+        self.cumulative_reg_value += self._compute_reg_fn(operand)
+        return torch.sigmoid(operand)
+
+    def init_hidden(self, batch_size):
+        self.h = torch.zeros(batch_size, self.hidden_size)
+        self.cumulative_reg_value = torch.zeros([])
+
+    @staticmethod
+    def _compute_reg_fn(operand):
+        abs_operand = torch.abs(operand)
+        reg_values = self.reg_weight / abs_operand
+        return torch.sum(reg_values)
