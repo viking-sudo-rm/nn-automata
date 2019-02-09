@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from discrete_rnn import NormalizedDiscreteSRN, RandomizedDiscreteSRN
+from discrete_rnn import NormalizedDiscreteSRN, RandomizedDiscreteSRN, RegularizedDiscreteSRN
 from utils import RNNModel
 
 
@@ -47,7 +47,7 @@ class BasicLSTMModel(nn.Module):
 def main():
     dataset_length = 1000
     string_length = 128
-    hidden_size = 16
+    hidden_size = 2
     batch_size = 16
 
     # Generate the data.
@@ -55,7 +55,8 @@ def main():
     strings_test, parities_test = make_dataset(dataset_length // 10, string_length)
 
     # Create model.
-    rnn_module = NormalizedDiscreteSRN(1, hidden_size)
+    # rnn_module = NormalizedDiscreteSRN(1, hidden_size)
+    rnn_module = RegularizedDiscreteSRN(1, hidden_size, reg_weight=100.)
     # rnn_module = RandomizedDiscreteSRN(1, hidden_size, min_value=1, max_value=1)
     model = RNNModel(rnn_module)
     criterion = nn.BCEWithLogitsLoss()
@@ -74,6 +75,7 @@ def main():
             optimizer.zero_grad()
             predicted_parity_batch = model(string_batch)
             loss = criterion(predicted_parity_batch, parity_batch)
+            loss += rnn_module.cumulative_reg_value # If we're using a RegularizedDiscreteSRN.
             loss.backward()
             optimizer.step()
 

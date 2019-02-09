@@ -13,7 +13,7 @@ class RandomizedDiscreteRNN(RNNModule):
         super(RandomizedDiscreteRNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        # TODO: Pass in distribution as an object.
+        # TODO: Pass in disubstribution as an object.
         self.distribution = torch.distributions.uniform.Uniform(min_value, max_value)
 
     def compute_gate(self, operand):
@@ -100,16 +100,16 @@ class RegularizedDiscreteSRN(RNNModule):
         self.weights_h = nn.Linear(hidden_size, hidden_size, bias=False)
 
     def forward(self, x):
-        operand = self.weights_x(x) + self.weights_h(h)
+        operand = self.weights_x(x) + self.weights_h(self.h)
         self.cumulative_reg_value += self._compute_reg_fn(operand)
-        return torch.sigmoid(operand)
+        self.h = torch.sigmoid(operand)
+        return self.h, self.h
 
     def init_hidden(self, batch_size):
         self.h = torch.zeros(batch_size, self.hidden_size)
         self.cumulative_reg_value = torch.zeros([])
 
-    @staticmethod
-    def _compute_reg_fn(operand):
+    def _compute_reg_fn(self, operand):
         abs_operand = torch.abs(operand)
         reg_values = self.reg_weight / abs_operand
-        return torch.sum(reg_values)
+        return torch.mean(reg_values)
