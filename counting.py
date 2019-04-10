@@ -36,15 +36,15 @@ class IntactModel(nn.Module):
 
     """LSTM model with sigmoid activations."""
 
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, rnn_type=nn.LSTM):
         super(IntactModel, self).__init__()
-        self.lstm = nn.LSTM(1, hidden_size, batch_first=True)
+        self.rnn = rnn_type(1, hidden_size, batch_first=True)
         self.linear = nn.Linear(hidden_size, 1)
 
     def forward(self, inputs):
         batch_size = inputs.size(0)
         sequence_length = inputs.size(1)
-        h, _ = self.lstm(inputs)
+        h, _ = self.rnn(inputs)
         y = self.linear(h)
         return y
 
@@ -75,13 +75,14 @@ def make_dataset(num_examples, string_length):
     return strings, counts
 
 
-def main(epochs=10, length=32, hidden_size=4):
+def main(model,
+         epochs=10,
+         length=32):
     # Make training data.
     strings, counts = make_dataset(1000, length)
     strings_test, counts_test = make_dataset(100, length)
 
-    # Create model.
-    model = BrokenModel(hidden_size)
+    # Create training boilerplate.
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters())
 
@@ -132,5 +133,5 @@ def test_across_lengths(min_length, max_length, epochs=30, trials=5, hidden_size
 
 
 if __name__ == "__main__":
-    # test_across_lengths(4, 8, epochs=30, trials=3, hidden_size=2)
-    main(length=32, epochs=30, hidden_size=2)
+    model = IntactModel(4, rnn_type=nn.LSTM)
+    main(model, length=1024, epochs=100)
