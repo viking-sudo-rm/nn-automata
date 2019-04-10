@@ -17,10 +17,7 @@ class WWRDatasetReader(DatasetReader):
         self._string_length = string_length
         self._token_indexers = {"tokens": SingleIdTokenIndexer()}
 
-    def build(self):
-        return self.read(None)
-
-    def _read(self, _):
+    def _read(self, options):
         for n in range(self._num_strings):
             tokens = [random.choice(self._TOKENS)
                       for _ in range(self._string_length)]

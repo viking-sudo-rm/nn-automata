@@ -11,6 +11,7 @@ from allennlp.nn.util import get_text_field_mask, sequence_cross_entropy_with_lo
 
 from data_readers.anbn import ANBNDatasetReader
 from data_readers.wwr import WWRDatasetReader
+from predictor import LanguageModelPredictor
 
 
 _NUM_EMBEDDINGS = 5
@@ -41,7 +42,10 @@ class LanguageModel(Model):
         logits = self._ff(rnn_states)
 
         predictions = torch.argmax(logits, dim=2).float()
-        results = {"predictions": predictions}
+        results = {
+            "predictions": predictions,
+            "rnn_states": rnn_states,
+        }
 
         if labels is not None:
             c_mask = (labels == self._c_idx).long()
@@ -64,16 +68,16 @@ def main():
     # TODO: Try self attention: https://github.com/allenai/allennlp/blob/master/allennlp/modules/seq2seq_encoders/stacked_self_attention.py.
 
     # Counting task.
-    # train_dataset = ANBNDatasetReader(5, 1000).build()
-    # test_dataset = ANBNDatasetReader(2000, 2200).build()
+    train_dataset = ANBNDatasetReader(5, 1000).build()
+    test_dataset = ANBNDatasetReader(2000, 2200).build()
 
-    # Reverse task.
-    train_dataset = WWRDatasetReader(1000, 50).build()
-    test_dataset = WWRDatasetReader(100, 100).build()
+    # # Reverse task.
+    # train_dataset = WWRDatasetReader(1000, 50).build()
+    # test_dataset = WWRDatasetReader(100, 100).build()
 
     vocab = Vocabulary.from_instances(train_dataset + test_dataset)  # This is just {a, b}.
 
-    model = LanguageModel(vocab, rnn_type=torch.nn.LSTM)
+    model = LanguageModel(vocab, rnn_type=torch.nn.RNN)
     optimizer = torch.optim.Adam(model.parameters())
     iterator = BucketIterator(batch_size=16, sorting_keys=[("sentence", "num_tokens")])
     iterator.index_with(vocab)
@@ -82,11 +86,25 @@ def main():
                       optimizer=optimizer,
                       iterator=iterator,
                       train_dataset=train_dataset,
-                      num_epochs=100,
+                      num_epochs=5,
                       validation_dataset=test_dataset,
                       patience=10
                      )
     trainer.train()
+
+    predictor = LanguageModelPredictor(model, ANBNDatasetReader(1, 1))
+    sentence = " ".join(["a" for _ in range(100)] + ["b" for _ in range(100)])
+    results = predictor.predict("a a a b b b c")
+    rnn_states = results["rnn_states"]
+    cell_series_iter = zip(*rnn_states)
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    for cell_series in cell_series_iter:
+        plt.plot(cell_series)
+    plt.savefig("plots/srn.png")
+
 
 if __name__ == "__main__":
     main()
