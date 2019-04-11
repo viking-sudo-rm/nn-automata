@@ -77,7 +77,8 @@ def main():
 
     vocab = Vocabulary.from_instances(train_dataset + test_dataset)  # This is just {a, b}.
 
-    model = LanguageModel(vocab, rnn_type=torch.nn.RNN)
+    model_name = "srn-2"
+    model = LanguageModel(vocab, rnn_type=torch.nn.RNN, rnn_dim=2)
     optimizer = torch.optim.Adam(model.parameters())
     iterator = BucketIterator(batch_size=16, sorting_keys=[("sentence", "num_tokens")])
     iterator.index_with(vocab)
@@ -92,9 +93,15 @@ def main():
                      )
     trainer.train()
 
+    with open("models/%s.th" % model_name, "wb") as fh:
+        torch.save(model.state_dict(), fh)
+
+    model.load_state_dict(torch.load("models/%s.th" % model_name))
     predictor = LanguageModelPredictor(model, ANBNDatasetReader(1, 1))
-    sentence = " ".join(["a" for _ in range(100)] + ["b" for _ in range(100)])
-    results = predictor.predict("a a a b b b c")
+    
+    n = 10
+    sentence = " ".join(["a" for _ in range(n)] + ["b" for _ in range(n)])
+    results = predictor.predict(sentence)
     rnn_states = results["rnn_states"]
     cell_series_iter = zip(*rnn_states)
 
@@ -103,7 +110,7 @@ def main():
     import matplotlib.pyplot as plt
     for cell_series in cell_series_iter:
         plt.plot(cell_series)
-    plt.savefig("plots/srn.png")
+    plt.savefig("plots/%s.png" % model_name)
 
 
 if __name__ == "__main__":
