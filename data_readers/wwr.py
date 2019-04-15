@@ -9,23 +9,29 @@ from allennlp.data.token_indexers import SingleIdTokenIndexer
 
 class WWRDatasetReader(DatasetReader):
 
-    _TOKENS = ["a", "b"]
+    TOKENS = ["a", "b"]
 
-    def __init__(self, num_strings, string_length):
+    def __init__(self, num_strings, min_length, max_length):
         super().__init__(lazy=False)
         self._num_strings = num_strings
-        self._string_length = string_length
+        self._min_length = min_length
+        self._max_length = max_length
         self._token_indexers = {"tokens": SingleIdTokenIndexer()}
 
     def build(self):
         return self.read(None)
 
+    def get_random_tokens(self):
+        length = random.randint(self._min_length, self._max_length)
+        tokens = [random.choice(self.TOKENS)
+                  for _ in range(length)]
+        tokens.append("#")
+        tokens.extend(reversed(tokens))
+        return tokens
+
     def _read(self, options):
         for n in range(self._num_strings):
-            tokens = [random.choice(self._TOKENS)
-                      for _ in range(self._string_length)]
-            tokens.append("#")
-            tokens.extend(reversed(tokens))
+            tokens = self.get_random_tokens()
             yield self.text_to_instance(tokens)
 
     def text_to_instance(self, text):

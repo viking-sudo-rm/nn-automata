@@ -1,4 +1,6 @@
 from overrides import overrides
+import argparse
+import random
 
 import torch
 from allennlp.models import Model
@@ -82,43 +84,72 @@ def plot_rnn_states(predictor, sentence):
     for cell_series in cell_series_iter:
         plt.plot(cell_series)
 
+    plt.xlabel("Token Index")
+    plt.ylabel("Cell Value")
 
-def main():
-    # Counting task.
-    train_dataset = ANBNDatasetReader(5, 1000).build()
-    test_dataset = ANBNDatasetReader(2000, 2200).build()
 
-    # Reverse task.
-    # train_dataset = WWRDatasetReader(1000, 50).build()
-    # test_dataset = WWRDatasetReader(100, 100).build()
+def main(task_name="count",
+         model_name="srn",
+         rnn_dim=2,
+         no_train=False):
 
+    if task_name == "count":
+        train_dataset_reader = ANBNDatasetReader(5, 1000)
+        train_dataset = train_dataset_reader.build()
+        test_dataset = ANBNDatasetReader(2000, 2200).build()
+    elif task_name == "reverse":
+        train_dataset_reader = WWRDatasetReader(1000, 3, 20)
+        train_dataset = train_dataset_reader.build()
+        test_dataset = WWRDatasetReader(100, 100, 102).build()
     vocab = Vocabulary.from_instances(train_dataset + test_dataset)  # This is just {a, b}.
 
-    model_name = "srn-2"
-    model = LanguageModel(vocab, rnn_type=torch.nn.RNN, rnn_dim=2)
+    model = LanguageModel(vocab, rnn_type=torch.nn.GRU, rnn_dim=rnn_dim)
     optimizer = torch.optim.Adam(model.parameters())
     iterator = BucketIterator(batch_size=16, sorting_keys=[("sentence", "num_tokens")])
     iterator.index_with(vocab)
 
-    # trainer = Trainer(model=model,
-    #                   optimizer=optimizer,
-    #                   iterator=iterator,
-    #                   train_dataset=train_dataset,
-    #                   num_epochs=5,
-    #                   validation_dataset=test_dataset,
-    #                  )
-    # trainer.train()
+    filename = "%s-%d" % (model_name, rnn_dim)
+    if task_name == "reverse":
+        filename += "-reverse"
 
-    with open("models/%s.th" % model_name, "wb") as fh:
-        torch.save(model.state_dict(), fh)
+    if not no_train:
+        trainer = Trainer(model=model,
+                          optimizer=optimizer,
+                          iterator=iterator,
+                          train_dataset=train_dataset,
+                          num_epochs=5,
+                          validation_dataset=test_dataset,
+                         )
+        trainer.train()
+        with open("models/%s.th" % filename, "wb") as fh:
+            torch.save(model.state_dict(), fh)
 
-    model.load_state_dict(torch.load("models/%s.th" % model_name))
+    model.load_state_dict(torch.load("models/%s.th" % filename))
 
-    predictor = LanguageModelPredictor(model, ANBNDatasetReader(1, 1))
-    n = 10
-    sentence = " ".join(["a" for _ in range(n)] + ["b" for _ in range(n)])
+    n = 11
+    if task_name == "count":
+        sentence = " ".join(["a" for _ in range(n)] + ["b" for _ in range(n)])
+    elif task_name == "reverse":
+        random.seed(2)
+        tokens = train_dataset_reader.get_random_tokens()
+        sentence = " ".join(tokens)
+    predictor = LanguageModelPredictor(model, train_dataset_reader)    
     plot_rnn_states(predictor, sentence)
-    plt.savefig("plots/%s.png" % model_name)
+    plt.savefig("plots/%s.png" % filename)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("task", choices=["count", "reverse"])
+    parser.add_argument("model", choices=["srn", "gru", "lstm"])
+    parser.add_argument("--dim", type=int, default=2)
+    parser.add_argument("--notrain", action="store_true")
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(task_name=args.task,
+         model_name=args.model,
+         rnn_dim=args.dim,
+         no_train=args.notrain)
