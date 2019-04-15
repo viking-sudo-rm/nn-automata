@@ -9,6 +9,10 @@ from allennlp.data.vocabulary import Vocabulary
 from allennlp.training.trainer import Trainer
 from allennlp.nn.util import get_text_field_mask, sequence_cross_entropy_with_logits
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 from data_readers.anbn import ANBNDatasetReader
 from data_readers.wwr import WWRDatasetReader
 from predictor import LanguageModelPredictor
@@ -32,8 +36,9 @@ class LanguageModel(Model):
         self._rnn = torch.nn.LSTM(embedding_dim, rnn_dim, batch_first=True)
         self._ff = torch.nn.Linear(rnn_dim, self._vocab_size)
 
-        self._accuracy = CategoricalAccuracy()
-        self._c_accuracy = CategoricalAccuracy()
+        self._acc = CategoricalAccuracy()
+        self._c_acc = CategoricalAccuracy()
+        self._second_half_acc = CategoricalAccuracy()
     
     def forward(self, sentence, labels=None):
         mask = get_text_field_mask(sentence)
@@ -49,8 +54,12 @@ class LanguageModel(Model):
 
         if labels is not None:
             c_mask = (labels == self._c_idx).long()
-            self._accuracy(logits, labels, mask)
-            self._c_accuracy(logits, labels, mask * c_mask)
+            midpoint_idx = labels.size(1) // 2
+            second_half_mask = torch.zeros_like(mask)
+            second_half_mask[:, midpoint_idx + 1:] = 1
+            self._acc(logits, labels, mask)
+            self._c_acc(logits, labels, mask * c_mask)
+            self._second_half_acc(logits, labels, mask * second_half_mask)
             loss = sequence_cross_entropy_with_logits(logits, labels, mask)
             results["loss"] = loss
 
@@ -59,19 +68,27 @@ class LanguageModel(Model):
     @overrides
     def get_metrics(self, reset):
         return {
-            "accuracy": self._accuracy.get_metric(reset),
-            "c_accuracy": self._c_accuracy.get_metric(reset)
+            "acc": self._acc.get_metric(reset),
+            "c_acc": self._c_acc.get_metric(reset),
+            "second_half_acc": self._second_half_acc.get_metric(reset),
         }
 
 
-def main():
-    # TODO: Try self attention: https://github.com/allenai/allennlp/blob/master/allennlp/modules/seq2seq_encoders/stacked_self_attention.py.
+def plot_rnn_states(predictor, sentence):
+    results = predictor.predict(sentence)
+    rnn_states = results["rnn_states"]
+    cell_series_iter = zip(*rnn_states)
 
+    for cell_series in cell_series_iter:
+        plt.plot(cell_series)
+
+
+def main():
     # Counting task.
     train_dataset = ANBNDatasetReader(5, 1000).build()
     test_dataset = ANBNDatasetReader(2000, 2200).build()
 
-    # # Reverse task.
+    # Reverse task.
     # train_dataset = WWRDatasetReader(1000, 50).build()
     # test_dataset = WWRDatasetReader(100, 100).build()
 
@@ -83,35 +100,25 @@ def main():
     iterator = BucketIterator(batch_size=16, sorting_keys=[("sentence", "num_tokens")])
     iterator.index_with(vocab)
 
-    trainer = Trainer(model=model,
-                      optimizer=optimizer,
-                      iterator=iterator,
-                      train_dataset=train_dataset,
-                      num_epochs=5,
-                      validation_dataset=test_dataset,
-                      patience=10
-                     )
-    trainer.train()
+    # trainer = Trainer(model=model,
+    #                   optimizer=optimizer,
+    #                   iterator=iterator,
+    #                   train_dataset=train_dataset,
+    #                   num_epochs=5,
+    #                   validation_dataset=test_dataset,
+    #                  )
+    # trainer.train()
 
     with open("models/%s.th" % model_name, "wb") as fh:
         torch.save(model.state_dict(), fh)
 
     model.load_state_dict(torch.load("models/%s.th" % model_name))
+
     predictor = LanguageModelPredictor(model, ANBNDatasetReader(1, 1))
-    
     n = 10
     sentence = " ".join(["a" for _ in range(n)] + ["b" for _ in range(n)])
-    results = predictor.predict(sentence)
-    rnn_states = results["rnn_states"]
-    cell_series_iter = zip(*rnn_states)
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    for cell_series in cell_series_iter:
-        plt.plot(cell_series)
+    plot_rnn_states(predictor, sentence)
     plt.savefig("plots/%s.png" % model_name)
-
 
 if __name__ == "__main__":
     main()
