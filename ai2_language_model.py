@@ -27,7 +27,7 @@ class LanguageModel(Model):
 
     def __init__(self,
                  vocab,
-                 embedding_dim=4,
+                 embedding_dim=1,
                  rnn_dim=4,
                  rnn_type=torch.nn.LSTM):
         super().__init__(vocab)
@@ -72,7 +72,7 @@ class LanguageModel(Model):
         return {
             "acc": self._acc.get_metric(reset),
             "c_acc": self._c_acc.get_metric(reset),
-            "second_half_acc": self._second_half_acc.get_metric(reset),
+            # "second_half_acc": self._second_half_acc.get_metric(reset),
         }
 
 
@@ -103,7 +103,14 @@ def main(task_name="count",
         test_dataset = WWRDatasetReader(100, 100, 102).build()
     vocab = Vocabulary.from_instances(train_dataset + test_dataset)  # This is just {a, b}.
 
-    model = LanguageModel(vocab, rnn_type=torch.nn.GRU, rnn_dim=rnn_dim)
+    if model_name == "srn":
+        rnn_type = torch.nn.RNN
+    elif model_name == "gru":
+        rnn_type = torch.nn.GRU
+    elif model_name == "lstm":
+        rnn_type = torch.nn.LSTM
+
+    model = LanguageModel(vocab, rnn_type=rnn_type, rnn_dim=rnn_dim)
     optimizer = torch.optim.Adam(model.parameters())
     iterator = BucketIterator(batch_size=16, sorting_keys=[("sentence", "num_tokens")])
     iterator.index_with(vocab)
