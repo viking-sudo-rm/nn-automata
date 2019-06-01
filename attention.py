@@ -7,12 +7,11 @@ def attention(queries, keys, values):
     """Compute scaled dot-product attention.
 
     Args:
-        queries: A [batch_size, query_len] matrix of queries.
+        queries: A [batch_size, num_queries, query_len] matrix of queries.
         keys: A [batch_size, seq_len, query_len] tensor of keys.
         values: A [batch_size, seq_len, value_len] tensor of values.
     """
-    query_dim = queries.size(1)
-    queries = queries.unsqueeze(dim=1)
+    query_dim = queries.size(2)
     keys = keys.transpose(1, 2)
     relevance = torch.matmul(queries, keys)
     scaled_relevance = relevance / sqrt(query_dim)
@@ -21,7 +20,7 @@ def attention(queries, keys, values):
 
 
 def test_attention():
-    queries = torch.zeros(10, 100)
+    queries = torch.zeros(10, 1, 100)
     keys = torch.zeros(10, 32, 100)
     values = torch.zeros(10, 32, 64)
     attention_vector = attention(queries, keys, values)

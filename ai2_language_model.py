@@ -18,8 +18,10 @@ import matplotlib.pyplot as plt
 
 from data_readers.anbn import ANBNDatasetReader
 from data_readers.wwr import WWRDatasetReader
+from data_readers.ww import WWDatasetReader
 from noisy_rnn import make_noisy_rnn_type
 from predictor import LanguageModelPredictor
+from seq2seq import Seq2SeqLanguageModel
 
 
 _NUM_EMBEDDINGS = 5
@@ -30,6 +32,7 @@ _MODELS = {
     "noisy-srn": make_noisy_rnn_type(torch.nn.RNNCell),
     "noisy-lstm": make_noisy_rnn_type(torch.nn.LSTMCell),
     "noisy-gru": make_noisy_rnn_type(torch.nn.GRUCell),
+    "seq2seq": None,
 }
 
 
@@ -101,20 +104,30 @@ def plot_rnn_states(predictor, sentence):
 def main(task_name="count",
          model_name="srn",
          rnn_dim=2,
-         no_train=False):
+         num_epochs=5,
+         no_train=False,
+         plot=False):
 
     if task_name == "count":
         train_dataset_reader = ANBNDatasetReader(5, 1000)
-        train_dataset = train_dataset_reader.build()
-        test_dataset = ANBNDatasetReader(2000, 2200).build()
+        test_dataset_reader = ANBNDatasetReader(2000, 2200)
     elif task_name == "reverse":
-        train_dataset_reader = WWRDatasetReader(1000, 3, 20)
-        train_dataset = train_dataset_reader.build()
-        test_dataset = WWRDatasetReader(100, 100, 102).build()
+        train_dataset_reader = WWRDatasetReader(10000, 3, 20)
+        test_dataset_reader = WWRDatasetReader(100, 30, 32)
+    elif task_name == "copy":
+        train_dataset_reader = WWDatasetReader(10000, 3, 20)
+        test_dataset_reader = WWDatasetReader(100, 30, 32)
+
+    train_dataset = train_dataset_reader.build()
+    test_dataset = test_dataset_reader.build()
     vocab = Vocabulary.from_instances(train_dataset + test_dataset)
 
-    rnn_type = _MODELS[model_name]
-    model = LanguageModel(vocab, rnn_type=rnn_type, rnn_dim=rnn_dim)
+    if model_name == "seq2seq":
+        model = Seq2SeqLanguageModel(vocab)
+    else:
+        rnn_type = _MODELS[model_name]
+        model = LanguageModel(vocab, rnn_type=rnn_type, rnn_dim=rnn_dim)
+
     optimizer = torch.optim.Adam(model.parameters())
     iterator = BucketIterator(batch_size=16,
                               sorting_keys=[("sentence", "num_tokens")])
@@ -129,7 +142,7 @@ def main(task_name="count",
                           optimizer=optimizer,
                           iterator=iterator,
                           train_dataset=train_dataset,
-                          num_epochs=5,
+                          num_epochs=num_epochs,
                           validation_dataset=test_dataset)
         trainer.train()
         with open("models/%s.th" % filename, "wb") as fh:
@@ -144,17 +157,21 @@ def main(task_name="count",
         random.seed(2)
         tokens = train_dataset_reader.get_random_tokens()
         sentence = " ".join(tokens)
-    predictor = LanguageModelPredictor(model, train_dataset_reader)
-    plot_rnn_states(predictor, sentence)
-    plt.savefig("plots/%s.png" % filename)
+
+    if plot:
+        predictor = LanguageModelPredictor(model, train_dataset_reader)
+        plot_rnn_states(predictor, sentence)
+        plt.savefig("plots/%s.png" % filename)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("task", choices=["count", "reverse"])
+    parser.add_argument("task", choices=["count", "reverse", "copy"])
     parser.add_argument("model", choices=_MODELS.keys())
     parser.add_argument("--dim", type=int, default=2)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--notrain", action="store_true")
+    parser.add_argument("--plot", action="store_true")
     return parser.parse_args()
 
 
@@ -163,4 +180,6 @@ if __name__ == "__main__":
     main(task_name=args.task,
          model_name=args.model,
          rnn_dim=args.dim,
-         no_train=args.notrain)
+         num_epochs=args.epochs,
+         no_train=args.notrain,
+         plot=args.plot)
