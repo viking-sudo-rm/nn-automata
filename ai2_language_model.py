@@ -9,7 +9,8 @@ from allennlp.training.metrics import CategoricalAccuracy
 from allennlp.data.iterators import BucketIterator
 from allennlp.data.vocabulary import Vocabulary
 from allennlp.training.trainer import Trainer
-from allennlp.nn.util import get_text_field_mask, sequence_cross_entropy_with_logits
+from allennlp.nn.util import get_text_field_mask
+from allennlp.nn.util import sequence_cross_entropy_with_logits
 
 import matplotlib
 matplotlib.use("Agg")
@@ -49,7 +50,7 @@ class LanguageModel(Model):
 
         self._acc = CategoricalAccuracy()
         self._c_acc = CategoricalAccuracy()
-        # self._second_half_acc = CategoricalAccuracy()
+        self._second_half_acc = CategoricalAccuracy()
 
     def forward(self, sentence, labels=None):
         mask = get_text_field_mask(sentence)
@@ -65,12 +66,12 @@ class LanguageModel(Model):
 
         if labels is not None:
             c_mask = (labels == self._c_idx).long()
-            # midpoint_idx = labels.size(1) // 2
-            # second_half_mask = torch.zeros_like(mask)
-            # second_half_mask[:, midpoint_idx + 1:] = 1
+            midpoint_idx = labels.size(1) // 2
+            second_half_mask = torch.zeros_like(mask)
+            second_half_mask[:, midpoint_idx + 1:] = 1
             self._acc(logits, labels, mask)
             self._c_acc(logits, labels, mask * c_mask)
-            # self._second_half_acc(logits, labels, mask * second_half_mask)
+            self._second_half_acc(logits, labels, mask * second_half_mask)
             loss = sequence_cross_entropy_with_logits(logits, labels, mask)
             results["loss"] = loss
 
@@ -80,8 +81,8 @@ class LanguageModel(Model):
     def get_metrics(self, reset):
         return {
             "acc": self._acc.get_metric(reset),
-            "c_acc": self._c_acc.get_metric(reset),
-            # "second_half_acc": self._second_half_acc.get_metric(reset),
+            # "c_acc": self._c_acc.get_metric(reset),
+            "second_half_acc": self._second_half_acc.get_metric(reset),
         }
 
 

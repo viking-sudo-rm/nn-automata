@@ -35,7 +35,8 @@ class WWRDatasetReader(DatasetReader):
             yield self.text_to_instance(tokens)
 
     def text_to_instance(self, text):
-        sentence = TextField([Token(word) for word in text[:-1]], self._token_indexers)
+        sentence = TextField([Token(word) for word in text[:-1]],
+                             self._token_indexers)
         labels = SequenceLabelField(text[1:], sequence_field=sentence)
         return Instance({
             "sentence": sentence,

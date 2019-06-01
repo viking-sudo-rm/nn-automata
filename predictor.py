@@ -1,6 +1,5 @@
 from overrides import overrides
 
-import torch
 from allennlp.predictors.predictor import Predictor
 
 
