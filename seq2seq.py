@@ -65,12 +65,20 @@ class Encoder(torch.nn.Module):
 
 class Decoder(torch.nn.Module):
 
-    def __init__(self, vocab_size, feature_dim, rnn_dim, masked):
+    def __init__(self, vocab_size, feature_dim, rnn_dim, masked, feedforward):
         super().__init__()
         self._masked = masked
-        self._rnn_cell = torch.nn.LSTMCell(feature_dim, rnn_dim)
-        # Query dimension = encoding dimension = RNN dimension.
-        self._query_transform = torch.nn.Linear(rnn_dim, rnn_dim, bias=False)
+        self._feedforward = feedforward
+
+        if feedforward:
+            self._query_transform = torch.nn.Linear(feature_dim + rnn_dim,
+                                                    rnn_dim,
+                                                    bias=False)
+        else:
+            self._rnn_cell = torch.nn.LSTMCell(feature_dim + rnn_dim, rnn_dim)
+            self._query_transform = torch.nn.Linear(rnn_dim, rnn_dim,
+                                                    bias=False)
+
         self._classifier = torch.nn.Linear(rnn_dim, vocab_size)
 
     @overrides
@@ -80,8 +88,15 @@ class Decoder(torch.nn.Module):
 
         for idx in range(seq_len):
             feature = features[:, idx, :]
-            rnn_state = self._rnn_cell(feature, rnn_state)
-            query = self._query_transform(rnn_state[0])
+            encoding = encodings[:, idx, :]
+            full_feature = torch.cat([feature, encoding], dim=1)
+
+            if self._feedforward:
+                query = self._query_transform(full_feature)
+            else:
+                rnn_state = self._rnn_cell(full_feature, rnn_state)
+                query = self._query_transform(rnn_state[0])
+
             query = query.unsqueeze(dim=1)
             if self._masked:
                 seen_encodings = encodings[:, :idx + 1, :]
@@ -93,7 +108,7 @@ class Decoder(torch.nn.Module):
         return torch.stack(logits, dim=1)
 
 
-class Seq2SeqLanguageModel(Model):
+class Seq2Seq(Model):
 
     def __init__(self,
                  vocab,
@@ -101,17 +116,22 @@ class Seq2SeqLanguageModel(Model):
                  pos_embedding_dim=None,
                  rnn_dim=16,
                  masked=True,
-                 disable_seq2seq=False):
+                 disable_attention=False,
+                 feedforward_decoder=False):
         super().__init__(vocab)
         vocab_size = vocab.get_vocab_size()
-        self._disable_seq2seq = disable_seq2seq
+        self._disable_attention = disable_attention
         self._pos_embedder = PositionalEmbedder(vocab_size,
                                                 word_embedding_dim,
                                                 pos_embedding_dim)
 
         feature_dim = self._pos_embedder.feature_dim
         self._encoder = Encoder(feature_dim, rnn_dim)
-        self._decoder = Decoder(vocab_size, feature_dim, rnn_dim, masked)
+        self._decoder = Decoder(vocab_size,
+                                feature_dim,
+                                rnn_dim,
+                                masked,
+                                feedforward_decoder)
 
         self._acc = CategoricalAccuracy()
         self._second_half_acc = CategoricalAccuracy()
@@ -122,7 +142,7 @@ class Seq2SeqLanguageModel(Model):
         features, mask = self._pos_embedder(sentence)
         encodings, rnn_state = self._encoder(features)
 
-        if not self._disable_seq2seq:
+        if not self._disable_attention:
             logits = self._decoder(features, encodings, rnn_state)
         else:
             logits = encodings
@@ -133,12 +153,12 @@ class Seq2SeqLanguageModel(Model):
         }
 
         if labels is not None:
-            midpoint_idx = labels.size(1) // 2
-            second_half_mask = torch.zeros_like(mask)
-            second_half_mask[:, midpoint_idx + 1:] = 1
+            # midpoint_idx = labels.size(1) // 2
+            # second_half_mask = torch.zeros_like(mask)
+            # second_half_mask[:, midpoint_idx + 1:] = 1
 
             self._acc(logits, labels, mask)
-            self._second_half_acc(logits, labels, mask * second_half_mask)
+            # self._second_half_acc(logits, labels, mask * second_half_mask)
 
             loss = sequence_cross_entropy_with_logits(logits, labels, mask)
             results["loss"] = loss
@@ -149,5 +169,5 @@ class Seq2SeqLanguageModel(Model):
     def get_metrics(self, reset):
         return {
             "acc": self._acc.get_metric(reset),
-            "second_half_acc": self._second_half_acc.get_metric(reset),
+            # "second_half_acc": self._second_half_acc.get_metric(reset),
         }

@@ -21,7 +21,7 @@ from data_readers.wwr import WWRDatasetReader
 from data_readers.ww import WWDatasetReader
 from noisy_rnn import make_noisy_rnn_type
 from predictor import LanguageModelPredictor
-from seq2seq import Seq2SeqLanguageModel
+from seq2seq import Seq2Seq
 
 
 _NUM_EMBEDDINGS = 5
@@ -112,10 +112,10 @@ def main(task_name="count",
         train_dataset_reader = ANBNDatasetReader(5, 1000)
         test_dataset_reader = ANBNDatasetReader(2000, 2200)
     elif task_name == "reverse":
-        train_dataset_reader = WWRDatasetReader(10000, 3, 20)
+        train_dataset_reader = WWRDatasetReader(100000, 3, 20)
         test_dataset_reader = WWRDatasetReader(100, 30, 32)
     elif task_name == "copy":
-        train_dataset_reader = WWDatasetReader(10000, 3, 20)
+        train_dataset_reader = WWDatasetReader(100000, 3, 20)
         test_dataset_reader = WWDatasetReader(100, 30, 32)
 
     train_dataset = train_dataset_reader.build()
@@ -123,7 +123,7 @@ def main(task_name="count",
     vocab = Vocabulary.from_instances(train_dataset + test_dataset)
 
     if model_name == "seq2seq":
-        model = Seq2SeqLanguageModel(vocab)
+        model = Seq2Seq(vocab)
     else:
         rnn_type = _MODELS[model_name]
         model = LanguageModel(vocab, rnn_type=rnn_type, rnn_dim=rnn_dim)
