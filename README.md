@@ -7,3 +7,7 @@ Example usage:
 ```shell
 python3 ai2_language_model.py count srn
 ```
+
+```shell
+python reverse_experiment.py --filename="test-reverse-lstm" --disable_attention
+```
