@@ -75,39 +75,72 @@ class Decoder(torch.nn.Module):
                                                     rnn_dim,
                                                     bias=False)
         else:
-            self._rnn_cell = torch.nn.LSTMCell(feature_dim + rnn_dim, rnn_dim)
+            self._rnn_cell = torch.nn.LSTMCell(1, rnn_dim)
             self._query_transform = torch.nn.Linear(rnn_dim, rnn_dim,
                                                     bias=False)
+            self._key_transform = torch.nn.Linear(rnn_dim, rnn_dim, bias=False)
 
         self._classifier = torch.nn.Linear(rnn_dim, vocab_size)
 
     @overrides
     def forward(self, features, encodings, rnn_state):
-        seq_len = features.size(1)
+        batch_size = encodings.size(0)
+        seq_len = encodings.size(1)
         logits = []
 
+        keys = self._key_transform(encodings)
+        zeros = torch.zeros(batch_size, 1)
+
         for idx in range(seq_len):
-            feature = features[:, idx, :]
-            encoding = encodings[:, idx, :]
-            full_feature = torch.cat([feature, encoding], dim=1)
-
-            if self._feedforward:
-                query = self._query_transform(full_feature)
-            else:
-                rnn_state = self._rnn_cell(full_feature, rnn_state)
-                query = self._query_transform(rnn_state[0])
-
-            query = query.unsqueeze(dim=1)
-            if self._masked:
-                seen_encodings = encodings[:, :idx + 1, :]
-            else:
-                seen_encodings = encodings
-            attention_vector = attention(query, seen_encodings, seen_encodings)
+            rnn_state = self._rnn_cell(zeros, rnn_state)
+            query = self._query_transform(rnn_state[0]).unsqueeze(dim=1)
+            attention_vector = attention(query, keys, encodings)
             logits.append(self._classifier(attention_vector))
+
+        # for idx in range(seq_len):
+        #     feature = features[:, idx, :]
+        #     encoding = encodings[:, idx, :]
+        #     full_feature = torch.cat([feature, encoding], dim=1)
+
+        #     if self._feedforward:
+        #         query = self._query_transform(full_feature)
+        #     else:
+        #         rnn_state = self._rnn_cell(full_feature, rnn_state)
+        #         query = self._query_transform(rnn_state[0])
+        #     query = query.unsqueeze(dim=1)
+
+        #     if self._masked:
+        #         seen_encodings = encodings[:, :idx + 1, :]
+        #     else:
+        #         seen_encodings = encodings
+
+        #     attention_vector = attention(query, seen_encodings, seen_encodings)
+        #     logits.append(self._classifier(attention_vector))
 
         return torch.stack(logits, dim=1)
 
 
+class LSTMDecoder(torch.nn.Module):
+
+    def __init__(self, vocab_size, feature_dim, rnn_dim):
+        super().__init__()
+        self._vocab_size = vocab_size
+        self._feature_dim = feature_dim
+        self._rnn_dim = rnn_dim
+
+        self._rnn = torch.nn.LSTM(feature_dim + rnn_dim, rnn_dim,
+                                  batch_first=True)
+        self._classifier = torch.nn.Linear(rnn_dim, vocab_size)
+
+    @overrides
+    def forward(self, features, encodings, rnn_state):
+        full_features = torch.cat([features, encodings], dim=2)
+        rnn_state = [tensor.unsqueeze(dim=0) for tensor in rnn_state]
+        hidden_states, _ = self._rnn(full_features, rnn_state)
+        return self._classifier(hidden_states)
+
+
+# TODO: http://www.realworldnlpbook.com/blog/building-seq2seq-machine-translation-models-using-allennlp.html
 class Seq2Seq(Model):
 
     def __init__(self,
@@ -120,32 +153,30 @@ class Seq2Seq(Model):
                  feedforward_decoder=False):
         super().__init__(vocab)
         vocab_size = vocab.get_vocab_size()
-        self._disable_attention = disable_attention
         self._pos_embedder = PositionalEmbedder(vocab_size,
                                                 word_embedding_dim,
                                                 pos_embedding_dim)
 
         feature_dim = self._pos_embedder.feature_dim
         self._encoder = Encoder(feature_dim, rnn_dim)
-        self._decoder = Decoder(vocab_size,
-                                feature_dim,
-                                rnn_dim,
-                                masked,
-                                feedforward_decoder)
+        if not disable_attention:
+            self._decoder = Decoder(vocab_size,
+                                    feature_dim,
+                                    rnn_dim,
+                                    masked,
+                                    feedforward_decoder)
+        else:
+            self._decoder = LSTMDecoder(vocab_size, feature_dim, rnn_dim)
 
         self._acc = CategoricalAccuracy()
-        self._second_half_acc = CategoricalAccuracy()
+        # self._second_half_acc = CategoricalAccuracy()
 
     @overrides
     def forward(self, sentence, labels=None):
         # Call all the seq2seq modules.
         features, mask = self._pos_embedder(sentence)
         encodings, rnn_state = self._encoder(features)
-
-        if not self._disable_attention:
-            logits = self._decoder(features, encodings, rnn_state)
-        else:
-            logits = encodings
+        logits = self._decoder(features, encodings, rnn_state)
 
         predictions = torch.argmax(logits, dim=2).float()
         results = {
