@@ -38,8 +38,7 @@ def evaluate(model, vocab, test_dataset):
 def main(args):
     # Data parameters for train, val, and test taken from:
     # https://github.com/viking-sudo-rm/StackNN/blob/master/configs.py
-    # lexicon = [str(idx) for idx in range(args.vocab_size)]
-    lexicon = ["a", "b"]
+    lexicon = [chr(97 + idx) for idx in range(args.vocab_size)]
     train_dataset_reader = WWRDatasetReader(800, 10, 2,
                                             max_length=12,
                                             vocabulary=lexicon,
