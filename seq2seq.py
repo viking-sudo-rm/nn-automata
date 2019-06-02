@@ -128,15 +128,18 @@ class LSTMDecoder(torch.nn.Module):
         self._feature_dim = feature_dim
         self._rnn_dim = rnn_dim
 
-        self._rnn = torch.nn.LSTM(feature_dim + rnn_dim, rnn_dim,
+        self._rnn = torch.nn.LSTM(1, rnn_dim,
                                   batch_first=True)
         self._classifier = torch.nn.Linear(rnn_dim, vocab_size)
 
     @overrides
     def forward(self, features, encodings, rnn_state):
-        full_features = torch.cat([features, encodings], dim=2)
+        batch_size = encodings.size(0)
+        seq_len = encodings.size(1)
+        # full_features = torch.cat([features, encodings], dim=2)
+        zeros = torch.zeros(batch_size, seq_len, 1)
         rnn_state = [tensor.unsqueeze(dim=0) for tensor in rnn_state]
-        hidden_states, _ = self._rnn(full_features, rnn_state)
+        hidden_states, _ = self._rnn(zeros, rnn_state)
         return self._classifier(hidden_states)
 
 
@@ -173,6 +176,8 @@ class Seq2Seq(Model):
 
     @overrides
     def forward(self, sentence, labels=None):
+        # sentence_lens = torch.sum((sentence != 0).int(), axis=-1)
+
         # Call all the seq2seq modules.
         features, mask = self._pos_embedder(sentence)
         encodings, rnn_state = self._encoder(features)
