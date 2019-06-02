@@ -23,6 +23,9 @@ def parse_args():
     parser.add_argument("--filename", type=str, default=None)
     parser.add_argument("--num_trials", type=int, default=None)
     parser.add_argument("--vocab_size", type=int, default=2)
+    # The --task flag is not suported.
+    parser.add_argument("--task", choices=["reverse", "copy"],
+                        default="reverse")
     return parser.parse_args()
 
 
@@ -39,6 +42,7 @@ def main(args):
     # Data parameters for train, val, and test taken from:
     # https://github.com/viking-sudo-rm/StackNN/blob/master/configs.py
     lexicon = [chr(97 + idx) for idx in range(args.vocab_size)]
+
     train_dataset_reader = WWRDatasetReader(800, 10, 2,
                                             max_length=12,
                                             vocabulary=lexicon,
@@ -105,9 +109,9 @@ def get_filename(args):
     if args.filename is not None:
         return args.filename
     elif args.disable_attention:
-        return "seq2seq-reverse"
+        return "seq2seq-" + args.task
     else:
-        return "seq2seq-attn-reverse"
+        return "seq2seq-attn-" + args.task
 
 
 if __name__ == "__main__":
@@ -120,8 +124,9 @@ if __name__ == "__main__":
     else:
         all_metrics = defaultdict(list)
         dirname = get_filename(args)
-        if not os.path.exists(dirname):
-            os.makedir(dirname)
+        path = os.path.join("models", dirname)
+        if not os.path.exists(path):
+            os.makedirs(path)
 
         for i in range(args.num_trials):
             print("Starting trial #%d" % i)
@@ -131,8 +136,12 @@ if __name__ == "__main__":
             for key in metrics:
                 all_metrics[key].append(metrics[key])
 
+        def _print_metric(key):
+            values = all_metrics[key]
+            print(key, np.mean(values), np.max(values))
+
         print("metric", "mean", "max")
-        test_accs = all_metrics["test_acc"]
-        gen_accs = all_metrics["gen_acc"]
-        print("test_acc", np.mean(test_accs), np.max(test_accs))
-        print("gen_acc", np.mean(gen_accs), np.max(gen_accs))
+        if "best_validation_acc" in all_metrics:
+            _print_metric("best_validation_acc")
+        _print_metric("test_acc")
+        _print_metric("gen_acc")
