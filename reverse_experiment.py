@@ -119,11 +119,13 @@ if __name__ == "__main__":
 
     else:
         all_metrics = defaultdict(list)
-        base_filename = get_filename(args)
+        dirname = get_filename(args)
+        if not os.path.exists(dirname):
+            os.makedir(dirname)
 
         for i in range(args.num_trials):
             print("Starting trial #%d" % i)
-            args.filename = os.path.join(base_filename, str(i))
+            args.filename = os.path.join(dirname, str(i))
             metrics = main(args)
             print(metrics)
             for key in metrics:
