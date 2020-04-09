@@ -3,6 +3,7 @@ import argparse
 import random
 
 import torch
+from allennlp.data.vocabulary import Vocabulary
 from allennlp.models import Model
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.training.metrics import CategoricalAccuracy
@@ -33,8 +34,8 @@ class LanguageModel(Model):
 
     def __init__(self,
                  vocab,
-                 embedding_dim=1,
-                 rnn_dim=4,
+                 embedding_dim: int = 1,
+                 rnn_dim: int = 4,
                  rnn_type: str = "srn"):
         super().__init__(vocab)
         self._vocab_size = vocab.get_vocab_size()

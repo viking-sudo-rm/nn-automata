@@ -1,3 +1,6 @@
+local DIM = std.parseInt(std.extVar("DIM"));
+
+
 {
   "dataset_reader": {
     "type": "anbn",
@@ -9,7 +12,7 @@
   "model": {
     "type": "djanky_lm",
     "rnn_type": "srn",
-    "dim": std.extVar("DIM"),
+    "rnn_dim": DIM,
   },
 
   "data_loader": {

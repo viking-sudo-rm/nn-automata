@@ -2,12 +2,10 @@
 
 This repository implements the formal language tasks that are referenced in my senior thesis/DELFOL submission.
 
-Example usage:
+Example usage for the anbn experiments:
 
 ```shell
-python3 ai2_language_model.py count srn
+DIM=4 allennlp train configs/anbn.jsonnet -s /tmp/rnn32 --include-package=src
 ```
 
-```shell
-python reverse_experiment.py --filename="test-reverse-lstm" --disable_attention
-```
+Experiments with string reversal are unmaintained, but the original code is still there.
