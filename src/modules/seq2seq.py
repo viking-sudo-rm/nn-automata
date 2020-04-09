@@ -7,7 +7,7 @@ from allennlp.nn.util import get_text_field_mask
 from allennlp.models import Model
 from allennlp.nn.util import sequence_cross_entropy_with_logits
 
-from attention import attention
+from src.modules.attention import attention
 
 
 _MAX_WORDS = 5

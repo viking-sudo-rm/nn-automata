@@ -9,7 +9,7 @@
   "model": {
     "type": "djanky_lm",
     "rnn_type": "srn",
-    "dim": 2
+    "dim": std.extVar("DIM"),
   },
 
   "data_loader": {
